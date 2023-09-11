@@ -1,4 +1,4 @@
-package com.krab.test_1;
+package com.krab.qoad;
 
 import org.lwjgl.Version;
 import org.lwjgl.glfw.GLFWErrorCallback;
@@ -19,14 +19,16 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 /**
  * Graciously written by <a href="https://github.com/wrightwriter">wrighter</a>
  * as a tutorial very different from every GL tutorial, because they suck
+ * Edited by Krab to learn.
  */
-public class HelloTriangle {
+@SuppressWarnings("DuplicatedCode")
+public class HelloQoad {
 
     // The window handle
     private long window;
 
     public void run() {
-        System.out.println("Hello Triangle!" + Version.getVersion());
+        System.out.println("Hello Qoad!" + Version.getVersion());
 
         init();
         loop();
@@ -40,66 +42,6 @@ public class HelloTriangle {
         glfwSetErrorCallback(null).free();
     }
 
-
-    private void loop() {
-        Texture tex = new Texture(400,400);
-
-        Framebuffer default_framebuffer = new Framebuffer();
-        Framebuffer custom_framebuffer = new Framebuffer(tex);
-
-        // Trongle goes from -1 to 1, because OpenGL coordinates go from -1 to 1 on each axis.
-        Buffer trongle_buffer = new Buffer(new float[]{
-                -1.0f,-1.0f,
-                1.0f,-1.0f,
-                0.0f,1.0f
-        });
-        // Bind as "SSBO", that means we can read it from the shader.
-        trongle_buffer.bind_as_SSBO(0);
-
-        ShaderProgram trongle_shader_prog = new ShaderProgram(
-                // vert
-                "#version 460\n" +
-                        "\n" +
-                        "layout (std430, binding = 0)  buffer ssbo {\n" + // The "SSBO"
-                        "    vec2[] verts;\n" +
-                        "};\n" +
-                        "out vec2 uv;\n" +
-                        "\n" +
-                        "void main(){\n" +
-                        "gl_Position = vec4(verts[gl_VertexID],0.,1.);\n" +
-                        "uv = gl_Position.xy;\n" +
-                        "}\n",
-                // frag
-                "#version 460\n" +
-                        "in vec2 uv;\n" +
-                        "out vec4 fragColor;\n" +
-                        "\n" +
-                        "void main(){\n" +
-                        "fragColor = vec4(uv.xyx,1.0);\n" +
-                        "}\n"
-        );
-
-        // Disable removal of clockwise triangles (culling)
-        GL46.glDisable(GL_CULL_FACE);
-
-        // Draw to this resolution.
-        GL46.glViewport(0,0, 400, 400);
-
-        while ( !glfwWindowShouldClose(window) ) {
-            custom_framebuffer.clear(0.4f,0,0,0);
-            // Binding means subsequent drawing will happen to this framebuffer.
-            custom_framebuffer.bind();
-
-            trongle_shader_prog.use();
-            // Issue 3 draw calls. A draw call is an invocation of a vertex shader. 3 of those define a trongle.
-            GL46.glDrawArrays(GL46.GL_TRIANGLES,0,3);
-
-            custom_framebuffer.copy_to_other_fb(default_framebuffer, GL46.GL_COLOR_BUFFER_BIT);
-
-            glfwSwapBuffers(window);
-            glfwPollEvents();
-        }
-    }
 
     private void init() {
         // Setup an error callback. The default implementation
@@ -116,7 +58,7 @@ public class HelloTriangle {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
 
         // Create the window
-        window = glfwCreateWindow(400, 400, "Hello World!", NULL, NULL);
+        window = glfwCreateWindow(600, 600, "Hello Qoad!", NULL, NULL);
         if ( window == NULL )
             throw new RuntimeException("Failed to create the GLFW window");
 
@@ -136,13 +78,14 @@ public class HelloTriangle {
 
             // Get the resolution of the primary monitor
             GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-
-            // Center the window
-            glfwSetWindowPos(
-                    window,
-                    (vidmode.width() - pWidth.get(0)) / 2,
-                    (vidmode.height() - pHeight.get(0)) / 2
-            );
+            if(vidmode != null){
+                // Center the window
+                glfwSetWindowPos(
+                        window,
+                        (vidmode.width() - pWidth.get(0)) / 2,
+                        (vidmode.height() - pHeight.get(0)) / 2
+                );
+            }
         } // the stack frame is popped automatically
 
         // Make the OpenGL context current
@@ -155,15 +98,82 @@ public class HelloTriangle {
 
         GL.createCapabilities();
 
-        glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+        glClearColor(0.4f, 0.0f, 0.0f, 0.0f);
 
         int vao = GL46.glGenVertexArrays();
         GL46.glBindVertexArray(vao);
 
     }
 
+    private void loop() {
+        Texture tex = new Texture(600,600);
+
+        Framebuffer default_framebuffer = new Framebuffer();
+        Framebuffer custom_framebuffer = new Framebuffer(tex);
+
+        // OpenGL coordinates go from -1 to 1 on each axis.
+        Buffer vertex_buffer = new Buffer(new float[]{
+                -1.0f, -1.0f,
+                 1.0f, -1.0f,
+                 1.0f,  1.0f,
+                -1.0f,  1.0f,
+        });
+        // Bind as "SSBO", that means we can read it from the shader.
+        vertex_buffer.bind_as_SSBO(0);
+
+        // The "SSBO"
+        ShaderProgram shader_program = new ShaderProgram(
+                // vert
+                """
+                        #version 460
+
+                        layout (std430, binding = 0)  buffer ssbo {
+                            vec2[] verts;
+                        };
+                        out vec2 uv;
+
+                        void main(){
+                            gl_Position = vec4(verts[gl_VertexID],0.,1.);
+                            uv = gl_Position.xy;
+                        }
+                """,
+
+                // frag
+                """
+                        #version 460
+                        in vec2 uv;
+                        out vec4 fragColor;
+
+                        void main(){
+                            fragColor = vec4(uv.xyx,1.0);
+                        }
+                """
+        );
+
+        // Disable removal of clockwise triangles (culling)
+        GL46.glDisable(GL_CULL_FACE);
+
+        // Draw to this resolution.
+        GL46.glViewport(0,0, 600, 600);
+
+        while ( !glfwWindowShouldClose(window) ) {
+            custom_framebuffer.clear(0.4f,0,0,0);
+            // Binding means subsequent drawing will happen to this framebuffer.
+            custom_framebuffer.bind();
+
+            shader_program.use();
+            // Issue 3 draw calls. A draw call is an invocation of a vertex shader. 3 of those define a trongle.
+            GL46.glDrawArrays(GL46.GL_QUADS,0,4);
+
+            custom_framebuffer.copy_to_other_fb(default_framebuffer, GL46.GL_COLOR_BUFFER_BIT);
+
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+        }
+    }
+
     public static void main(String[] args) {
-        new HelloTriangle().run();
+        new HelloQoad().run();
     }
 
 }
