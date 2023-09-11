@@ -26,7 +26,7 @@ public class HelloTriangle {
     private long window;
 
     public void run() {
-//        System.out.println("Hello LWJGL " + Version.getVersion() + "!");
+        System.out.println("Hello Triangle!" + Version.getVersion());
 
         init();
         loop();
