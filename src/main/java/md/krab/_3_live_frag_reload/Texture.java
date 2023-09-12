@@ -1,4 +1,4 @@
-package md.krab._3_hot_reload;
+package md.krab._3_live_frag_reload;
 
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL45;

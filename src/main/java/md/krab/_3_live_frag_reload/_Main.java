@@ -1,4 +1,4 @@
-package md.krab._3_hot_reload;
+package md.krab._3_live_frag_reload;
 
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
@@ -136,8 +136,8 @@ public class _Main {
         // Bind as "SSBO", that means we can read it from the shader.
         vertex_buffer.bind_as_SSBO(0);
 
-        Path fragPath = Paths.get("src/main/java/md/krab/_3_hot_reload/frag.glsl");
-        Path vertPath = Paths.get("src/main/java/md/krab/_3_hot_reload/vert.glsl");
+        Path fragPath = Paths.get("src/main/java/md/krab/_3_live_frag_reload/frag.glsl");
+        Path vertPath = Paths.get("src/main/java/md/krab/_3_live_frag_reload/vert.glsl");
         String vertBody;
         String fragBody;
 
@@ -173,8 +173,7 @@ public class _Main {
             fb_writeable.bind();
 
             // try hot reload if file has changed since last time we've compiled it
-            FileTime fragLastModifiedCurrent;
-            fragLastModifiedCurrent = Files.getLastModifiedTime(fragPath);
+            FileTime fragLastModifiedCurrent = Files.getLastModifiedTime(fragPath);
             if(fragLastModifiedCurrent.compareTo(fragLastModified) > 0){
                 fragLastModified = fragLastModifiedCurrent;
                 shader_program.setFragString(Files.readString(fragPath));
