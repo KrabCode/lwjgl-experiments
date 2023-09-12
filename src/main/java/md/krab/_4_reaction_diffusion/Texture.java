@@ -29,8 +29,8 @@ public class Texture {
 		// How it interpolates and wraps pixels when you sample from a shader.
 		GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
 		GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-		GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
-		GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
+		GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_WRAP_S, GL11.GL_CLAMP);
+		GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_WRAP_T, GL11.GL_CLAMP);
 
 		// Allocate tex
 		GL46.glTextureStorage2D(

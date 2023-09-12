@@ -6,7 +6,7 @@ in vec2 uv;
 out vec4 fragColor;
 
 void main(){
-    float blue = clamp(texture2D(img, 0.5+0.5*uv).b * 2., 0., 1.);
-    vec3 col = vec3(blue);
+    float blue = texture2D(img, 0.5+0.5*uv).b;
+    vec3 col = clamp(vec3(blue)* 2., 0., 1.);;
     fragColor = vec4(col.rgb,1.0);
 }

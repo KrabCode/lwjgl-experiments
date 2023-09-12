@@ -35,8 +35,9 @@ public class _Main {
     float time;
     FileTime fragLastModified;
     FileTime fragOutLastModified;
-    int width = 800;
-    int height = 800;
+    int width = 1200;
+    int height = 600;
+
 
     public void run() throws IOException {
         init();
@@ -67,12 +68,15 @@ public class _Main {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
         glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
-//        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+        glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
+        glfwWindowHint(GLFW_REFRESH_RATE, 144);
+        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
 
 
         String title = getClass().getPackageName();
-        // Create the window
-        window = glfwCreateWindow(width, height, title, NULL, NULL);
+        boolean fullscreen = false;
+        //noinspection ConstantValue
+        window = glfwCreateWindow(width, height, title, fullscreen ? glfwGetMonitors().get(1) : NULL, NULL);
         if (window == NULL)
             throw new RuntimeException("Failed to create the GLFW window");
 
@@ -96,8 +100,8 @@ public class _Main {
             if (vidmode != null) {
                 glfwSetWindowPos(
                         window,
-                        vidmode.width() - pWidth.get(0) - 40,
-                        40
+                        vidmode.width() - pWidth.get(0),
+                        0
                 );
             }
 
