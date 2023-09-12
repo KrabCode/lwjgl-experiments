@@ -111,10 +111,13 @@ public class _Main {
     }
 
     private void loop() {
-        Texture tex = new Texture(600,600);
+        Texture tex0 = new Texture(600,600);
+        Texture tex1 = new Texture(600,600);
 
         Framebuffer default_framebuffer = new Framebuffer();
-        Framebuffer custom_framebuffer = new Framebuffer(tex);
+        Framebuffer custom_framebuffer_0 = new Framebuffer(tex0);
+        Framebuffer custom_framebuffer_1 = new Framebuffer(tex1);
+        Framebuffer[] custom_framebuffers = new Framebuffer[]{custom_framebuffer_0, custom_framebuffer_1};
 
         // OpenGL coordinates go from -1 to 1 on each axis.
         Buffer vertex_buffer = new Buffer(new float[]{
@@ -177,10 +180,20 @@ public class _Main {
         // Draw to this resolution.
         glViewport(0,0, 600, 600);
 
+        int swapping_index = 0;
+
         while ( !glfwWindowShouldClose(window) ) {
-            custom_framebuffer.clear(0.4f,0,0,0);
+            swapping_index++;
+            swapping_index %= 2;
+            Framebuffer fb_writeable = custom_framebuffers[0];
+            Framebuffer fb_readable  = custom_framebuffers[1];
+            if(swapping_index == 1){
+                fb_writeable = custom_framebuffers[1];
+                fb_readable  = custom_framebuffers[0];
+            }
+            fb_writeable.clear(0.4f,0,0,0);
             // Binding means subsequent drawing will happen to this framebuffer.
-            custom_framebuffer.bind();
+            fb_writeable.bind();
 
             shader_program.use();
 
@@ -192,14 +205,14 @@ public class _Main {
                 glProgramUniform1f(program_id, time_loc, time);
             }
 
+            fb_readable.texture.bindToUnit(2);
             int bb_loc = glGetUniformLocation(program_id, "bb");
-//            glUniform1i(bb_loc, 0);
-            glProgramUniform1i(program_id, bb_loc, 0);
+            glProgramUniform1i(program_id, bb_loc, 2);
 
             // Issue 3 draw calls. A draw call is an invocation of a vertex shader. 3 of those define a trongle.
             glDrawArrays(GL_TRIANGLES,0,6);
 
-            custom_framebuffer.copy_to_other_fb(default_framebuffer, GL_COLOR_BUFFER_BIT);
+            fb_writeable.copy_to_other_fb(default_framebuffer, GL_COLOR_BUFFER_BIT);
 
             glfwSwapBuffers(window);
             glfwPollEvents();

@@ -4,7 +4,7 @@ import org.lwjgl.opengl.GL46;
 
 public class Framebuffer {
     int gl_id;
-    Texture texture;
+    public Texture texture;
 
     // Don't call this constructor, this just creates the default framebuffer with gl_id of 0.
     public Framebuffer() {
