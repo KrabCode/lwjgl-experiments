@@ -189,11 +189,12 @@ public class _Main {
             time += 0.01f;
             int time_loc = glGetUniformLocation(program_id, "time");
             if(time_loc != -1 ){
-                glUniform1f(time_loc, time);
+                glProgramUniform1f(program_id, time_loc, time);
             }
 
             int bb_loc = glGetUniformLocation(program_id, "bb");
-            glUniform1i(bb_loc, 0);
+//            glUniform1i(bb_loc, 0);
+            glProgramUniform1i(program_id, bb_loc, 0);
 
             // Issue 3 draw calls. A draw call is an invocation of a vertex shader. 3 of those define a trongle.
             glDrawArrays(GL_TRIANGLES,0,6);

@@ -41,4 +41,7 @@ public class Texture {
 				resy
         );
 	}
+	public void bindToUnit(int unit){
+		GL46.glBindTextureUnit(unit,this.gl_handle);
+	}
 }
