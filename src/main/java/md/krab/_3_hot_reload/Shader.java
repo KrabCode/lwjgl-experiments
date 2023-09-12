@@ -1,4 +1,4 @@
-package md.krab._2_backbuffer;
+package md.krab._3_hot_reload;
 
 import org.lwjgl.opengl.GL46;
 
@@ -8,13 +8,11 @@ public class Shader {
 	String error = "";
 	boolean compilation_success = false;
 	String code;
-
 	public Shader(String code, int shader_type){
 		this.shader_type = shader_type;
 		this.code = code;
 		this.compile();
 	}
-
 	public void compile(){
 		// delete prev iteration of this shader, if doing live reloading
 		if (gl_id > 0) {

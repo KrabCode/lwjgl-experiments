@@ -1,19 +1,22 @@
-package md.krab._2_backbuffer;
+package md.krab._3_hot_reload;
 
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 
+import java.io.IOException;
 import java.nio.IntBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.GL_CULL_FACE;
 import static org.lwjgl.opengl.GL11.glClearColor;
 import static org.lwjgl.opengl.GL46.*;
-import static org.lwjgl.stb.STBImage.stbi_image_free;
-import static org.lwjgl.stb.STBImage.stbi_load;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
@@ -28,8 +31,9 @@ public class _Main {
     // The window handle
     private long window;
     float time;
+    FileTime fragLastModified;
 
-    public void run() {
+    public void run() throws IOException {
         init();
         loop();
 
@@ -110,7 +114,7 @@ public class _Main {
 
     }
 
-    private void loop() {
+    private void loop() throws IOException {
         Texture tex0 = new Texture(600,600);
         Texture tex1 = new Texture(600,600);
 
@@ -132,48 +136,18 @@ public class _Main {
         // Bind as "SSBO", that means we can read it from the shader.
         vertex_buffer.bind_as_SSBO(0);
 
+        Path fragPath = Paths.get("src/main/java/md/krab/_3_hot_reload/frag.glsl");
+        Path vertPath = Paths.get("src/main/java/md/krab/_3_hot_reload/vert.glsl");
+        String vertBody;
+        String fragBody;
+
+        fragLastModified = Files.getLastModifiedTime(fragPath);
+        fragBody = Files.readString(fragPath);
+        vertBody = Files.readString(vertPath);
+
 
         // The "SSBO"
-        ShaderProgram shader_program = new ShaderProgram(
-                // vert
-                """
-                        #version 460
-
-                        layout (std430, binding = 0)  buffer ssbo {
-                            vec2[] verts;
-                        };
-                                                
-                        out vec2 uv;
-
-                        void main(){
-                            gl_Position = vec4(verts[gl_VertexID],0.,1.);
-                            uv = gl_Position.xy;
-                        }
-                """,
-
-                // frag
-                """
-                        #version 460
-                        
-                        uniform float time;
-                        uniform sampler2D bb;
-                        in vec2 uv;
-                        
-                        out vec4 fragColor;
-
-                        void main(){
-                            vec3 col = vec3(0);
-                            float r = 0.5;
-                            float t = time;
-                            vec2 rot = vec2(r*cos(t), r*sin(t));
-                            col += vec3(smoothstep(0.1, 0.05, length(uv-rot)));
-                            vec3 lastCol = texture2D(bb, 0.5+0.5*uv).rgb;
-                            lastCol = max(lastCol, col);
-                            lastCol -= 0.001;
-                            fragColor = vec4(lastCol,1.0);
-                        }
-                """
-        );
+        ShaderProgram shader_program = new ShaderProgram(vertBody, fragBody);
 
         // Disable removal of clockwise triangles (culling)
         glDisable(GL_CULL_FACE);
@@ -184,6 +158,7 @@ public class _Main {
         int swapping_index = 0;
 
         while ( !glfwWindowShouldClose(window) ) {
+            // swap the two buffers to achieve a backbuffer uniform inside the frag shader
             swapping_index++;
             swapping_index %= 2;
             Framebuffer fb_writeable = custom_framebuffers[0];
@@ -192,10 +167,23 @@ public class _Main {
                 fb_writeable = custom_framebuffers[1];
                 fb_readable  = custom_framebuffers[0];
             }
+
             fb_writeable.clear(0.4f,0,0,0);
             // Binding means subsequent drawing will happen to this framebuffer.
             fb_writeable.bind();
 
+            // try hot reload if file has changed since last time we've compiled it
+            FileTime fragLastModifiedCurrent;
+            fragLastModifiedCurrent = Files.getLastModifiedTime(fragPath);
+            if(fragLastModifiedCurrent.compareTo(fragLastModified) > 0){
+                fragLastModified = fragLastModifiedCurrent;
+                shader_program.setFragString(Files.readString(fragPath));
+                shader_program.frag_shader.compile();
+                shader_program.link();
+                print("recompiled and relinked shader");
+            }
+
+            // apply shader program
             shader_program.use();
 
             // set uniform
@@ -205,6 +193,8 @@ public class _Main {
             if(time_loc != -1 ){
                 glProgramUniform1f(program_id, time_loc, time);
             }
+            int res_loc = glGetUniformLocation(program_id, "res");
+            if(res_loc!= -1) glProgramUniform2f(program_id, res_loc, 600f, 600f);
 
             fb_readable.texture.bindToUnit(0);
             int bb_loc = glGetUniformLocation(program_id, "bb");
@@ -225,7 +215,11 @@ public class _Main {
     }
 
     public static void main(String[] args) {
-        new _Main().run();
+        try {
+            new _Main().run();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 
