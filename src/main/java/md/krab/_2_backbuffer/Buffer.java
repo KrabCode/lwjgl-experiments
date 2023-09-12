@@ -1,4 +1,4 @@
-package com.krab.qoad;
+package md.krab._2_backbuffer;
 
 import org.lwjgl.opengl.GL46;
 
@@ -12,7 +12,7 @@ public class Buffer {
     }
 
     public void bind_as_SSBO(int bind_idx) {
-        GL46.glBindBufferBase(GL46.GL_SHADER_STORAGE_BUFFER, 0, this.gl_id);
+        GL46.glBindBufferBase(GL46.GL_SHADER_STORAGE_BUFFER, bind_idx, this.gl_id);
     }
 
     public void create() {

@@ -1,10 +1,8 @@
-package com.krab.qoad;
+package md.krab._2_backbuffer;
 
-import org.lwjgl.Version;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL46;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
@@ -13,6 +11,9 @@ import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.GL_CULL_FACE;
 import static org.lwjgl.opengl.GL11.glClearColor;
+import static org.lwjgl.opengl.GL46.*;
+import static org.lwjgl.stb.STBImage.stbi_image_free;
+import static org.lwjgl.stb.STBImage.stbi_load;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
@@ -22,14 +23,13 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  * Edited by Krab to learn.
  */
 @SuppressWarnings("DuplicatedCode")
-public class HelloQoad {
+public class _Main {
 
     // The window handle
     private long window;
+    float time;
 
     public void run() {
-        System.out.println("Hello Qoad!" + Version.getVersion());
-
         init();
         loop();
 
@@ -44,6 +44,7 @@ public class HelloQoad {
 
 
     private void init() {
+        System.out.println("Started!");
         // Setup an error callback. The default implementation
         // will print the error message in System.err.
         GLFWErrorCallback.createPrint(System.err).set();
@@ -57,11 +58,12 @@ public class HelloQoad {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
         glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
-        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+//        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
 
 
+        String title = getClass().getSimpleName();
         // Create the window
-        window = glfwCreateWindow(600, 600, "Hello Qoad!", NULL, NULL);
+        window = glfwCreateWindow(600, 600, title, NULL, NULL);
         if ( window == NULL )
             throw new RuntimeException("Failed to create the GLFW window");
 
@@ -88,6 +90,7 @@ public class HelloQoad {
                         40
                 );
             }
+
         } // the stack frame is popped automatically
 
         // Make the OpenGL context current
@@ -102,8 +105,8 @@ public class HelloQoad {
 
         glClearColor(0.4f, 0.0f, 0.0f, 0.0f);
 
-        int vao = GL46.glGenVertexArrays();
-        GL46.glBindVertexArray(vao);
+        int vao = glGenVertexArrays();
+        glBindVertexArray(vao);
 
     }
 
@@ -117,11 +120,15 @@ public class HelloQoad {
         Buffer vertex_buffer = new Buffer(new float[]{
                 -1.0f, -1.0f,
                  1.0f, -1.0f,
-                 1.0f,  1.0f,
+                -1.0f,  1.0f,
+
+                 1.0f, 1.0f,
+                 1.0f, -1.0f,
                 -1.0f,  1.0f,
         });
         // Bind as "SSBO", that means we can read it from the shader.
         vertex_buffer.bind_as_SSBO(0);
+
 
         // The "SSBO"
         ShaderProgram shader_program = new ShaderProgram(
@@ -132,6 +139,7 @@ public class HelloQoad {
                         layout (std430, binding = 0)  buffer ssbo {
                             vec2[] verts;
                         };
+                                                
                         out vec2 uv;
 
                         void main(){
@@ -143,21 +151,31 @@ public class HelloQoad {
                 // frag
                 """
                         #version 460
+                        
+                        uniform float time;
+                        uniform sampler2D bb;
                         in vec2 uv;
+                        
                         out vec4 fragColor;
 
                         void main(){
-                            vec3 clr = vec3(0.5+0.5*uv.x);
-                            fragColor = vec4(clr,1.0);
+                            vec3 col = vec3(0);
+                            float r = 0.5;
+                            float t = time;
+                            vec2 rot = vec2(r*cos(t), r*sin(t));
+                            col += vec3(smoothstep(0.1, 0.05, length(uv-rot)));
+                            vec3 lastCol = texture2D(bb, uv).rgb;
+                            col = mix(col, lastCol, 0.9);
+                            fragColor = vec4(col,1.0);
                         }
                 """
         );
 
         // Disable removal of clockwise triangles (culling)
-        GL46.glDisable(GL_CULL_FACE);
+        glDisable(GL_CULL_FACE);
 
         // Draw to this resolution.
-        GL46.glViewport(0,0, 600, 600);
+        glViewport(0,0, 600, 600);
 
         while ( !glfwWindowShouldClose(window) ) {
             custom_framebuffer.clear(0.4f,0,0,0);
@@ -165,18 +183,38 @@ public class HelloQoad {
             custom_framebuffer.bind();
 
             shader_program.use();
-            // Issue 3 draw calls. A draw call is an invocation of a vertex shader. 3 of those define a trongle.
-            GL46.glDrawArrays(GL46.GL_QUADS,0,4);
 
-            custom_framebuffer.copy_to_other_fb(default_framebuffer, GL46.GL_COLOR_BUFFER_BIT);
+            // set uniform
+            int program_id = shader_program.gl_id;
+            time += 0.01f;
+            int time_loc = glGetUniformLocation(program_id, "time");
+            if(time_loc != -1 ){
+                glUniform1f(time_loc, time);
+            }
+
+            int bb_loc = glGetUniformLocation(program_id, "bb");
+            glUniform1i(bb_loc, 0);
+
+            // Issue 3 draw calls. A draw call is an invocation of a vertex shader. 3 of those define a trongle.
+            glDrawArrays(GL_TRIANGLES,0,6);
+
+            custom_framebuffer.copy_to_other_fb(default_framebuffer, GL_COLOR_BUFFER_BIT);
 
             glfwSwapBuffers(window);
             glfwPollEvents();
         }
     }
 
-    public static void main(String[] args) {
-        new HelloQoad().run();
+    private void print(Object any) {
+        System.out.println(any);
     }
+
+    public static void main(String[] args) {
+        new _Main().run();
+    }
+
+
+
+
 
 }

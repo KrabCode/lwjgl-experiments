@@ -1,4 +1,4 @@
-package com.krab.qoad;
+package md.krab._0_qoad;
 
 import org.lwjgl.opengl.GL46;
 

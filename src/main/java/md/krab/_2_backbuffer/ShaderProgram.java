@@ -1,4 +1,4 @@
-package com.krab.qoad;
+package md.krab._2_backbuffer;
 import org.lwjgl.opengl.GL46;
 
 public class ShaderProgram {
