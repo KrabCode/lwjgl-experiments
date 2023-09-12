@@ -164,8 +164,8 @@ public class _Main {
                             float t = time;
                             vec2 rot = vec2(r*cos(t), r*sin(t));
                             col += vec3(smoothstep(0.1, 0.05, length(uv-rot)));
-                            vec3 lastCol = texture2D(bb, uv).rgb;
-                            col = mix(col, lastCol, 0.9);
+                            vec3 lastCol = texture2D(bb, uv).rgb; // bb is just black atm
+                            col = mix(col, lastCol, 0.5);
                             fragColor = vec4(col,1.0);
                         }
                 """
