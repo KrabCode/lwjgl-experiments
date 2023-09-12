@@ -32,6 +32,7 @@ public class _Main {
     private long window;
     float time;
     FileTime fragLastModified;
+    FileTime fragOutLastModified;
 
     public void run() throws IOException {
         init();
@@ -115,13 +116,13 @@ public class _Main {
     }
 
     private void loop() throws IOException {
-        Texture tex0 = new Texture(600,600);
-        Texture tex1 = new Texture(600,600);
 
         Framebuffer default_framebuffer = new Framebuffer();
-        Framebuffer custom_framebuffer_0 = new Framebuffer(tex0);
-        Framebuffer custom_framebuffer_1 = new Framebuffer(tex1);
-        Framebuffer[] custom_framebuffers = new Framebuffer[]{custom_framebuffer_0, custom_framebuffer_1};
+        Framebuffer custom_framebuffer_0 = new Framebuffer(new Texture(600,600));
+        Framebuffer custom_framebuffer_1 = new Framebuffer(new Texture(600,600));
+        Framebuffer[] swappable_framebuffers = new Framebuffer[]{custom_framebuffer_0, custom_framebuffer_1};
+
+        Framebuffer custom_framebuffer_out = new Framebuffer(new Texture(600,600));
 
         // OpenGL coordinates go from -1 to 1 on each axis.
         Buffer vertex_buffer = new Buffer(new float[]{
@@ -136,18 +137,13 @@ public class _Main {
         // Bind as "SSBO", that means we can read it from the shader.
         vertex_buffer.bind_as_SSBO(0);
 
+        Path fragOutPath = Paths.get("src/main/java/md/krab/_3_live_frag_reload/frag_out.glsl");
         Path fragPath = Paths.get("src/main/java/md/krab/_3_live_frag_reload/frag.glsl");
         Path vertPath = Paths.get("src/main/java/md/krab/_3_live_frag_reload/vert.glsl");
-        String vertBody;
-        String fragBody;
-
-        fragLastModified = Files.getLastModifiedTime(fragPath);
-        fragBody = Files.readString(fragPath);
-        vertBody = Files.readString(vertPath);
-
 
         // The "SSBO"
-        ShaderProgram shader_program = new ShaderProgram(vertBody, fragBody);
+        ShaderProgram shader_program_swap = new ShaderProgram(vertPath, fragPath);
+        ShaderProgram shader_program_out = new ShaderProgram(vertPath, fragOutPath);
 
         // Disable removal of clockwise triangles (culling)
         glDisable(GL_CULL_FACE);
@@ -155,17 +151,17 @@ public class _Main {
         // Draw to this resolution.
         glViewport(0,0, 600, 600);
 
-        int swapping_index = 0;
+        int swap_index = 0;
 
         while ( !glfwWindowShouldClose(window) ) {
             // swap the two buffers to achieve a backbuffer uniform inside the frag shader
-            swapping_index++;
-            swapping_index %= 2;
-            Framebuffer fb_writeable = custom_framebuffers[0];
-            Framebuffer fb_readable  = custom_framebuffers[1];
-            if(swapping_index == 1){
-                fb_writeable = custom_framebuffers[1];
-                fb_readable  = custom_framebuffers[0];
+            swap_index++;
+            swap_index %= 2;
+            Framebuffer fb_writeable = swappable_framebuffers[0];
+            Framebuffer fb_readable  = swappable_framebuffers[1];
+            if(swap_index == 1){
+                fb_writeable = swappable_framebuffers[1];
+                fb_readable  = swappable_framebuffers[0];
             }
 
             fb_writeable.clear(0.4f,0,0,0);
@@ -173,36 +169,40 @@ public class _Main {
             fb_writeable.bind();
 
             // try hot reload if file has changed since last time we've compiled it
-            FileTime fragLastModifiedCurrent = Files.getLastModifiedTime(fragPath);
-            if(fragLastModifiedCurrent.compareTo(fragLastModified) > 0){
-                fragLastModified = fragLastModifiedCurrent;
-                shader_program.setFragString(Files.readString(fragPath));
-                shader_program.frag_shader.compile();
-                shader_program.link();
-                print("recompiled and relinked shader");
-            }
-
             // apply shader program
-            shader_program.use();
+            shader_program_swap.use();
 
             // set uniform
-            int program_id = shader_program.gl_id;
+            int program_id = shader_program_swap.gl_id;
             time += 0.01f;
             int time_loc = glGetUniformLocation(program_id, "time");
             if(time_loc != -1 ){
                 glProgramUniform1f(program_id, time_loc, time);
             }
             int res_loc = glGetUniformLocation(program_id, "res");
-            if(res_loc!= -1) glProgramUniform2f(program_id, res_loc, 600f, 600f);
+            glProgramUniform2f(program_id, res_loc, 600f, 600f);
 
             fb_readable.texture.bindToUnit(0);
             int bb_loc = glGetUniformLocation(program_id, "bb");
             glProgramUniform1i(program_id, bb_loc, 0);
 
-            // Issue 3 draw calls. A draw call is an invocation of a vertex shader. 3 of those define a trongle.
+            // draw quad to the currently bound swappable framebuffer
             glDrawArrays(GL_TRIANGLES,0,6);
 
-            fb_writeable.copy_to_other_fb(default_framebuffer, GL_COLOR_BUFFER_BIT);
+            // prepare an intermediary output framebuffer for coloring the final output with the frag_out shader
+            custom_framebuffer_out.bind();
+            shader_program_out.use();
+
+            // bind the result of the previous draw to a slot used as a uniform "img" by the frag_out shader
+            fb_writeable.texture.bindToUnit(0);
+            int img_loc = glGetUniformLocation(shader_program_out.gl_id, "img");
+            glProgramUniform1i(shader_program_out.gl_id, img_loc, 0);
+
+            // draw the final result to the intermediary output framebuffer using the frag_out shader
+            glDrawArrays(GL_TRIANGLES,0,6);
+
+            // copy the result to screen
+            custom_framebuffer_out.copy_to_other_fb(default_framebuffer, GL_COLOR_BUFFER_BIT);
 
             glfwSwapBuffers(window);
             glfwPollEvents();

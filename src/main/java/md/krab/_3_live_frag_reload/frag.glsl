@@ -15,6 +15,6 @@ void main(){
     col += vec3(smoothstep(0.1, 0.05, length(uv-rot)));
     vec3 lastCol = texture2D(bb, 0.5+0.5*uv).rgb;
     lastCol = max(lastCol, col);
-    lastCol -= 0.001;
+    lastCol -= 0.002;
     fragColor = vec4(lastCol,1.0);
 }
