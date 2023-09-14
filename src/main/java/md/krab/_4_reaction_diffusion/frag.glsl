@@ -10,8 +10,8 @@ out vec4 fragColor;
 
 const float dA = 1.;
 const float dB = 0.50;
-const float f = 0.00707;
-const float k = 0.03830;
+const float f = 0.03722;
+const float k = 0.05840;
 const float t = 1.0;
 
 vec2 getValuesFromColor(vec4 col){
@@ -61,7 +61,7 @@ void main(){
     vec2 newValues = simulateReactionDiffusion(st);
     vec2 mouseNorm = mouse/resolution.xy;
     mouseNorm.y = 1.-mouseNorm.y;
-    float mouseRadius = 0.02;
+    float mouseRadius = 0.05;
 
     newValues.y = max(newValues.y, smoothstep(mouseRadius, mouseRadius*0.5, length((0.5+0.5*st)-mouseNorm)));
     fragColor = max(seedColor, setValuesFromColor(newValues));

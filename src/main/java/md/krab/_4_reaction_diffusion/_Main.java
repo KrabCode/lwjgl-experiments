@@ -4,12 +4,16 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL45;
+import org.lwjgl.opengl.GL46;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.windows.INPUT;
 
 import java.io.IOException;
 import java.nio.DoubleBuffer;
 import java.nio.IntBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
@@ -33,10 +37,9 @@ public class _Main {
     // The window handle
     private long window;
     float time;
-    FileTime fragLastModified;
-    FileTime fragOutLastModified;
-    int width = 1200;
-    int height = 600;
+    int width = 2560;
+    int height = 1440;
+    boolean fullscreen = true;
 
 
     public void run() throws IOException {
@@ -68,15 +71,14 @@ public class _Main {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
         glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
-        glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
+//        glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
         glfwWindowHint(GLFW_REFRESH_RATE, 144);
         glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
 
 
         String title = getClass().getPackageName();
-        boolean fullscreen = false;
         //noinspection ConstantValue
-        window = glfwCreateWindow(width, height, title, fullscreen ? glfwGetMonitors().get(1) : NULL, NULL);
+        window = glfwCreateWindow(width, height, title, fullscreen ? glfwGetMonitors().get(0) : NULL, NULL);
         if (window == NULL)
             throw new RuntimeException("Failed to create the GLFW window");
 
@@ -146,9 +148,9 @@ public class _Main {
         // Bind as "SSBO", that means we can read it from the shader.
         vertex_buffer.bind_as_SSBO(0);
 
-        Path fragOutPath = Paths.get("src/main/java/md/krab/_4_reaction_diffusion/frag_out.glsl");
-        Path fragPath = Paths.get("src/main/java/md/krab/_4_reaction_diffusion/frag.glsl");
         Path vertPath = Paths.get("src/main/java/md/krab/_4_reaction_diffusion/vert.glsl");
+        Path fragPath = Paths.get("src/main/java/md/krab/_4_reaction_diffusion/frag.glsl");
+        Path fragOutPath = Paths.get("src/main/java/md/krab/_4_reaction_diffusion/frag_out.glsl");
 
         // The "SSBO"
         ShaderProgram shader_program_swap = new ShaderProgram(vertPath, fragPath);
@@ -239,5 +241,270 @@ public class _Main {
         }
     }
 
+    public class Buffer {
+        int gl_id;
+        float[] data;
 
+        public Buffer(float[] data) {
+            this.data = data;
+            create();
+        }
+
+        public void bind_as_SSBO(int bind_idx) {
+            GL46.glBindBufferBase(GL46.GL_SHADER_STORAGE_BUFFER, bind_idx, this.gl_id);
+        }
+
+        public void create() {
+            gl_id = GL46.glCreateBuffers();
+            // GL_DYNAMIC_STORAGE_BIT literally doesn't matter nor do anything that matters.
+            GL46.glNamedBufferStorage(gl_id, this.data, GL46.GL_DYNAMIC_STORAGE_BIT);
+        }
+
+        public void clear() {
+            // Dumbass GL makes you write out "formats" when clearing a buffer.
+            // A buffer is just some numbers, either int, uint or float.
+            // whyyyyyyyy
+            GL46.glClearNamedBufferData(
+                    gl_id,
+                    GL46.GL_R32F,
+                    GL46.GL_RED,
+                    GL46.GL_FLOAT,
+                    new float[]{0.0f}
+            );
+        }
+
+    }
+
+    public class Shader {
+        int gl_id = 0;
+        int shader_type;
+        String error = "";
+        boolean compilation_success = false;
+        String code;
+
+        public Shader(String code, int shader_type){
+            this.shader_type = shader_type;
+            this.code = code;
+            this.compile();
+        }
+
+        public void compile(){
+            // delete prev iteration of this shader, if doing live reloading
+            if (gl_id > 0) {
+                GL46.glDeleteShader(gl_id);
+            }
+            gl_id = GL46.glCreateShader(this.shader_type);
+            GL46.glShaderSource(gl_id, code);
+            GL46.glCompileShader(gl_id);
+            if (GL46.glGetShaderi(gl_id, GL46.GL_COMPILE_STATUS) == 0) {
+                error = GL46.glGetShaderInfoLog(gl_id, 1024);
+                System.out.println(error);
+                GL46.glDeleteShader(gl_id);
+                compilation_success = false;
+            } else {
+                error = null;
+                compilation_success = true;
+            }
+        }
+    }
+
+
+    public class Texture {
+        int gl_handle;
+
+        int internal_format;
+        int format;
+        int type;
+
+        int resx;
+        int resy;
+        public Texture(
+                int resx,
+                int resy
+        ){
+            // GL is retarded so you have a separate format, internal format and type.
+            this.internal_format = GL46.GL_RGBA32F;
+            this.format = GL46.GL_RGBA;
+            this.type = GL46.GL_FLOAT;
+            this.resx = resx;
+            this.resy = resy;
+
+            this.gl_handle = GL45.glCreateTextures(GL46.GL_TEXTURE_2D);
+
+            // How it interpolates and wraps pixels when you sample from a shader.
+            GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+            GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_WRAP_S, GL11.GL_CLAMP);
+            GL46.glTextureParameteri(gl_handle, GL11.GL_TEXTURE_WRAP_T, GL11.GL_CLAMP);
+
+            // Allocate tex
+            GL46.glTextureStorage2D(
+                    gl_handle,
+                    1, // mipmap levels
+                    internal_format,
+                    resx,
+                    resy
+            );
+        }
+        public void bindToUnit(int unit){
+            GL46.glBindTextureUnit(unit,this.gl_handle);
+        }
+    }
+
+
+    public class ShaderProgram {
+        int gl_id = 0;
+
+        Path vertPath;
+        Path fragPath;
+        FileTime fragLastModified;
+        FileTime vertLastModified;
+
+        Shader vert_shader;
+        Shader frag_shader;
+        String error;
+
+        public ShaderProgram(Path vertPath, Path fragPath){
+            String vertString;
+            String fragString;
+            this.vertPath = vertPath;
+            this.fragPath = fragPath;
+            try {
+                vertString = Files.readString(vertPath);
+                fragString = Files.readString(fragPath);
+                vertLastModified = Files.getLastModifiedTime(vertPath);
+                fragLastModified = Files.getLastModifiedTime(fragPath);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            vert_shader = new Shader(vertString,GL46.GL_VERTEX_SHADER);
+            frag_shader = new Shader(fragString,GL46.GL_FRAGMENT_SHADER);
+            link();
+        }
+
+        public void use(){
+            tryLiveReload();
+            GL46.glUseProgram(gl_id);
+        }
+
+        public void link(){
+            boolean success;
+            int new_gl_id = GL46.glCreateProgram();
+            GL46.glAttachShader(new_gl_id, vert_shader.gl_id);
+            GL46.glAttachShader(new_gl_id, frag_shader.gl_id);
+
+            GL46.glLinkProgram(new_gl_id);
+            if (GL46.glGetProgrami(new_gl_id, GL46.GL_LINK_STATUS) == 0) {
+                success = false;
+                error = GL46.glGetProgramInfoLog(new_gl_id, 1024);
+                System.err.println(error);
+            } else {
+                GL46.glValidateProgram(new_gl_id);
+                success = true;
+                if (GL46.glGetProgrami(new_gl_id, GL46.GL_VALIDATE_STATUS) == 0) {
+                    error = GL46.glGetProgramInfoLog(new_gl_id, 1024);
+                    System.err.println("Warning validating Shader code: \n " + error + "\n");
+                }
+            }
+            if (!success) {
+                // Delete new program.
+                if (new_gl_id > 0) GL46.glDeleteProgram(new_gl_id);
+            } else {
+                // Replace old pid with new pid.
+                GL46.glDeleteProgram(gl_id);
+                gl_id = new_gl_id;
+                error = null;
+                // Delete new shaders.
+                GL46.glDetachShader(gl_id, vert_shader.gl_id);
+                GL46.glDetachShader(gl_id, frag_shader.gl_id);
+            }
+        }
+
+        private void tryLiveReload() {
+            boolean eitherChanged = false;
+            try {
+                FileTime fragLastModifiedCurrent = Files.getLastModifiedTime(fragPath);
+                if(fragLastModifiedCurrent.compareTo(fragLastModified) > 0){
+                    fragLastModified = fragLastModifiedCurrent;
+                    String newFragBody = Files.readString(fragPath);
+                    frag_shader = new Shader(newFragBody, GL46.GL_FRAGMENT_SHADER);
+                    frag_shader.compile();
+                    System.out.println("recompiled frag shader " + fragPath);
+                    eitherChanged = true;
+                }
+                FileTime vertLastModifiedCurrent = Files.getLastModifiedTime(vertPath);
+                if(vertLastModifiedCurrent.compareTo(vertLastModified) > 0){
+                    vertLastModified = vertLastModifiedCurrent;
+                    String newVertBody = Files.readString(fragPath);
+                    vert_shader = new Shader(newVertBody, GL46.GL_FRAGMENT_SHADER);
+                    vert_shader.compile();
+                    System.out.println("recompiled vert shader " + vertPath);
+                    eitherChanged = true;
+                }
+                if(eitherChanged){
+                    link();
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+    }
+
+    public class Framebuffer {
+        int gl_id;
+        public Texture texture;
+
+        // Don't call this constructor, this just creates the default framebuffer with gl_id of 0.
+        public Framebuffer() {
+            gl_id = 0;
+        }
+
+        public Framebuffer(Texture texture) {
+            gl_id = GL46.glCreateFramebuffers(); // creates one fb, but it's plural Framebuffers lol!
+
+            this.texture = texture;
+
+            GL46.glNamedFramebufferTexture(
+                    this.gl_id,
+                    GL46.GL_COLOR_ATTACHMENT0, // bind image to first "target" of the framebuffer. You can render to multiple images at once, each one is a target.
+                    texture.gl_handle,
+                    0 // mipmap level
+            );
+            GL46.glNamedFramebufferDrawBuffers(this.gl_id, GL46.GL_COLOR_ATTACHMENT0); // enable drawing to image at target 0
+
+            int fbStatus = GL46.glCheckNamedFramebufferStatus(this.gl_id, GL46.GL_FRAMEBUFFER);
+            if (fbStatus != GL46.GL_FRAMEBUFFER_COMPLETE) {
+                System.out.println("ERROR");
+                // error
+            }
+        }
+
+        public void bind() {
+            GL46.glBindFramebuffer(GL46.GL_FRAMEBUFFER, gl_id);
+        }
+
+        public void clear(float r, float g, float b, float a) {
+            GL46.glClearNamedFramebufferfv(
+                    this.gl_id,
+                    GL46.GL_COLOR,
+                    0, // clear first image target
+                    new float[]{r, g, b, a}
+            );
+        }
+
+        public void copy_to_other_fb(
+                Framebuffer other,
+                int bitmask
+        ) {
+            int resx = this.texture.resx;
+            int resy = this.texture.resy;
+            GL46.glBlitNamedFramebuffer(
+                    this.gl_id, other.gl_id,
+                    0, 0, resx, resy,
+                    0, 0, resx, resy,
+                    bitmask, GL46.GL_NEAREST
+            );
+        }
+    }
 }
