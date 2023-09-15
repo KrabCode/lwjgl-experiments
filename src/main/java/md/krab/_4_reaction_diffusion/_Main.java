@@ -37,9 +37,9 @@ public class _Main {
     // The window handle
     private long window;
     float time;
-    int width = 2560;
-    int height = 1440;
-    boolean fullscreen = true;
+    int width = 600;
+    int height = 600;
+    boolean fullscreen = false;
 
 
     public void run() throws IOException {
