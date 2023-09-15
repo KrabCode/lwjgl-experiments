@@ -10,8 +10,8 @@ out vec4 fragColor;
 
 const float dA = 1.;
 const float dB = 0.50;
-const float f = 0.03722;
-const float k = 0.05840;
+const float k = 0.04485;
+const float f = 0.01409;
 const float t = 1.0;
 
 vec2 getValuesFromColor(vec4 col){
